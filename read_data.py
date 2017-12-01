@@ -9,5 +9,9 @@ def read_data():
 	     visual_feat_mapping = json.load(f)['IR_imgid2id']
 
 	with open('Data/Easy/IR_train_easy.json') as f:
-		data = json.load(f)
-	return visual_feat_mapping, data
+		data_easy = json.load(f)
+
+	with open('Data/Hard/IR_train_hard.json') as f:
+		data_hard = json.load(f)
+
+	return visual_feat_mapping, data_easy, data_hard
