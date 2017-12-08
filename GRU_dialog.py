@@ -37,7 +37,8 @@ class GRULM(nn.Module):
         #self.linear = nn.Linear(embedding_dim, vocab_size)
 
         #self.gru = nn.GRU(EMBEDDING_FEAT*CONTEXT_SIZE*2, hidden_size)
-        self.gru = nn.GRU(embedding_dim, hidden_size, num_layers, batch_first=True) #batch_first=True?
+        #self.gru = nn.GRU(embedding_dim, hidden_size, num_layers, batch_first=True) #batch_first=True?
+        self.lstm = nn.LSTM(embedding_dim, hidden_size, num_layers, batch_first=True) #batch_first=True?
         self.linear = nn.Linear(hidden_size, vocab_size)
         self.init_weights()
 
@@ -52,14 +53,15 @@ class GRULM(nn.Module):
         embedded_input = self.embedding(inputs)
 
         # Forward propagate GRU
-        out, h = self.gru(embedded_input, hidden)
+        #out, h = self.gru(embedded_input, hidden)
+        out, h = self.lstm(embedded_input, hidden)
 
         # Reshape output
         out = out.contiguous().view(out.size(0)*out.size(1), out.size(2))
         #rearranged = hn.view(hn.size()[1], hn.size(2))
 
         out = self.linear(out)
-        return out
+        return out, h
         #print(embedded_input)
         #embedded = nn.GRU()
         #GRU model here
@@ -118,12 +120,15 @@ def context_to_index(context, w2i):
 
 @timer
 def train_model(context_data, vocab_size, w2i):
-    torch.cuda.manual_seed(1)
+    #torch.cuda.manual_seed(1)
+    torch.manual_seed(1)
     losses = []
     # CBOW minimizes the negative log likelihood
-    loss_function = nn.CrossEntropyLoss()
+
     model = GRULM(CONTEXT_SIZE, EMBEDDING_DIM, vocab_size, HIDDEN_SIZE, NUM_LAYERS)
-    model.cuda()
+    loss_function = nn.CrossEntropyLoss()
+
+    #model.cuda()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     def detach(states):
@@ -139,25 +144,30 @@ def train_model(context_data, vocab_size, w2i):
         context_indices[:, count] = context_to_index(context, w2i)
         targets[:, count] = [w2i[target]]
         count += 1
-
+    print(context_indices.shape)
     print("done")
 
     for iteration in range(EPOCHS):
         states = (Variable(torch.zeros(NUM_LAYERS, BATCH_SIZE, HIDDEN_SIZE)),
               Variable(torch.zeros(NUM_LAYERS, BATCH_SIZE, HIDDEN_SIZE)))
-        total_loss = torch.cuda.FloatTensor([0])
+        #total_loss = torch.cuda.FloatTensor([0])
+        total_loss = torch.FloatTensor([0])
     #count = 0
         booltje = False
         #for context, target in context_data:#
-        for i in range(0, context_indices.shape[1] - BATCH_SIZE, BATCH_SIZE):
+        for i in range(0, context_indices.shape[1] - CONTEXT_SIZE*2, CONTEXT_SIZE*2): # Is this really correct? TODO
             #context_batch = np.zeros((BATCH_SIZE, 1))
-    #context_batch = context_indices[:, t:t+b](
+            #context_batch = context_indices[:, t:t+b](
             #context_batch = Variable(context_batch)
-            inputs = torch.from_numpy(context_indices[:, i:i+BATCH_SIZE]).cuda()
-            inputs.type(torch.cuda.LongTensor)
+            #inputs = torch.from_numpy(context_indices[:, i:i+BATCH_SIZE]).cuda()
+            inputs = torch.from_numpy(context_indices[:, i:i+CONTEXT_SIZE*2])
+            #inputs.type(torch.cuda.LongTensor)
+            inputs.type(torch.LongTensor)
             inputs = Variable(inputs)
-            targets = torch.from_numpy(targets[:, i:i+BATCH_SIZE]).cuda()
-            targets.type(torch.cuda.LongTensor)
+            #targets = torch.from_numpy(targets[:, i:i+BATCH_SIZE]).cuda()
+            targets = torch.from_numpy(targets[:, i:i+CONTEXT_SIZE*2])
+            #targets.type(torch.cuda.LongTensor)
+            targets.type(torch.LongTensor)
             targets = Variable(targets)
             # if(not booltje):
             #     print("c", context_vector)
@@ -177,7 +187,7 @@ def train_model(context_data, vocab_size, w2i):
             optimizer.step()
             total_loss += loss.data
 
-            step = (i+1) // BATCH_SIZE
+            step = (i+1) // CONTEXT_SIZE*2
             if step % 100 == 0:
                 print ('Epoch [%d/%d], Step[%d/%d], Loss: %.3f, Perplexity: %5.2f' %
                        (iteration+1, EPOCHS, step, context_indices.shape[1] // BATCH_SIZE.exp(loss.data[0])))
