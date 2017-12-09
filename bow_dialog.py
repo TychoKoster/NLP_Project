@@ -17,9 +17,10 @@ import time
 
 CONTEXT_SIZE = 1
 EMBEDDING_DIM = 300
-ITERATIONS = 1
+ITERATIONS = 10
 BATCH_SIZE = 256
-MODEL_PATH = 'CBOW.pt'
+MODEL_PATH_EASY = 'CBOW_EASY.pth'
+MODEL_PATH_HARD = 'CBOW_HARD.pth'
 
 class CBOW(nn.Module):
 	def __init__(self, embedding_dim, vocab_size, w2i):
@@ -41,7 +42,7 @@ class CBOW(nn.Module):
 		return self.loss_function(probabilities, target)
 
 	def embed_word(self, word):
-		return self.embedding(autograd.Variable(torch.LongTensor(self.w2i[word])))
+		return self.embedding(autograd.Variable(torch.LongTensor(np.array([self.w2i[word]]))))
 
 # Simple timer decorator
 def timer(func):
@@ -131,11 +132,13 @@ def load_model(path):
 	return model
 
 def main():
-	_, data_easy, data_hard = rd.read_data()
-	context_data, vocab_size, w2i = process_data(data_easy)
-	model = train_model_batches(context_data, vocab_size, w2i)
-	# save_model(model, MODEL_PATH)
-	# model = load_model(MODEL_PATH)
+	# _, data_easy, data_hard = rd.read_data()
+	# context_data, vocab_size, w2i = process_data(data_easy)
+	# model = train_model_batches(context_data, vocab_size, w2i)
+	# save_model(model, MODEL_PATH_EASY)
+	model = load_model(MODEL_PATH_EASY)
+	print(model.embed_word('yachts'))
+
 
 if __name__ == "__main__":
 	main()
