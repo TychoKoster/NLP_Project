@@ -2,6 +2,7 @@
 # Shuffle data?
 
 from collections import Counter
+from bow_dialog import CBOW
 
 #from random import shuffle
 from sklearn.utils import shuffle
@@ -23,9 +24,10 @@ import time
 NUM_LAYERS = 1
 CONTEXT_SIZE = 3
 SEQ_LEN = CONTEXT_SIZE
-EMBEDDING_DIM = 128
+EMBEDDING_DIM = 300
 EPOCHS = 5
-MODEL_PATH = 'GRULM.pt'
+MODEL_PATH = 'GRULM.pth'
+EMBED_MODEL_PATH = 'CBOW_EASY.pth'
 BATCH_SIZE = 256
 HIDDEN_SIZE = 128
 LEARNING_RATE = 0.002
@@ -33,6 +35,7 @@ LEARNING_RATE = 0.002
 class GRULM(nn.Module):
     def __init__(self, context_size, embedding_dim, vocab_size, hidden_size, num_layers):
         super(GRULM, self).__init__()
+        self.embed_model = load_model(EMBED_MODEL_PATH)
 
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_size, num_layers, batch_first=True, dropout=0.5, bidirectional=True) #batch_first=True?
@@ -48,6 +51,7 @@ class GRULM(nn.Module):
     def forward(self, inputs):
     # Embed the context of a word and sum it into an embedded vector
         embedded_input = self.embedding(inputs)
+        # embedded_input = self.embed_model.embed_tensor_input(inputs)
 
         # Since the network is bidirectional, we need 2 layers
         h0 = Variable(torch.zeros(NUM_LAYERS*2, BATCH_SIZE, HIDDEN_SIZE)).cuda()
@@ -141,8 +145,12 @@ def train_model(data_points, vocab_size, w2i):
     for iteration in range(EPOCHS):
 
         for i in range(0, num_data_points - BATCH_SIZE, BATCH_SIZE):# - CONTEXT_SIZE*2, CONTEXT_SIZE*2): # Is this really correct? TODO
-            batch_input = data_points[0][i:i+BATCH_SIZE]
-            batch_output = data_points[1][i:i+BATCH_SIZE]
+            if i + BATCH_SIZE >= num_data_points:
+                batch_input = data_points[0][i:]
+                batch_output = data_points[1][i:]
+            else:
+                batch_input = data_points[0][i:i+BATCH_SIZE]
+                batch_output = data_points[1][i:i+BATCH_SIZE]
             inputs = Variable(torch.from_numpy(batch_input)).cuda()
             targets = Variable(torch.from_numpy(batch_output)).cuda()
             targets = targets.view(-1)
@@ -173,8 +181,13 @@ def main():
     data_points = make_data_points(sequences[:16000], w2i)
     small_set = data_points
     model = train_model(small_set, vocab_size, w2i)
-    save_model(model, MODEL_PATH)
-    # model = load_model(MODEL_PATH)
+    # save_model(model, MODEL_PATH)
+    # model = load_model(model, MODEL_PATH)
+
+    # model = load_model(EMBED_MODEL_PATH)
+    # print(model.embed_word_vector(['yachts']))
+    # print(model.embed_index_vector([100]))
+
 
 if __name__ == "__main__":
     main()
