@@ -42,13 +42,9 @@ class CBOW(nn.Module):
         return self.loss_function(probabilities, target)
 
     def embed_word_vector(self, word_vector):
-        return self.embedding(autograd.Variable(torch.LongTensor(np.array(context_to_index(word_vector, self.w2i))))).cuda()
-
-    def embed_index_vector(self, index_vector):
-        return self.embedding(autograd.Variable(torch.LongTensor(np.array(index_vector)))).cuda()
-
-    def embed_tensor_input(self, tensor_input):
-        return self.embedding(tensor_input).cuda()
+        embedded_vector = self.embedding(autograd.Variable(torch.LongTensor(np.array(context_to_index(word_vector, self.w2i))))).cuda()
+        embedded_vector = torch.sum(embedded_vector, dim=0).view(1, -1)
+        return embedded_vector.data.cpu().numpy()
 
 # Simple timer decorator
 def timer(func):
@@ -139,7 +135,7 @@ def load_model(path):
     return model
 
 def main():
-    # _, data_easy, data_hard = rd.read_data()
+    # _, _, data_easy, data_hard = rd.read_data()
     # context_data, vocab_size, w2i = process_data(data_easy)
     # model = train_model_batches(context_data, vocab_size, w2i)
     # save_model(model, MODEL_PATH_EASY)
