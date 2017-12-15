@@ -1,12 +1,15 @@
 from collections import Counter
 from itertools import compress
 from itertools import chain
+from nltk.corpus import stopwords
+from stemming.porter2 import stem
 
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+
 
 
 import read_data as rd
@@ -25,6 +28,7 @@ MODEL_PATH_EASY = 'CBOW_EASY.pth'
 MODEL_PATH_HARD = 'CBOW_HARD.pth'
 EASY = 'Easy'
 HARD = 'Hard' 
+PREPROCCES = True
 
 class CBOW(nn.Module):
     def __init__(self, embedding_dim, vocab_size, w2i):
@@ -76,14 +80,43 @@ def retrieve_context_data(context_data, vocabulary, sentence):
     return context_data, vocabulary
 
 # Retrieve context data and the vocabulary of the dialog and captions
-def process_data(data):
+# def process_data(data):
+#     context_data = []
+#     vocabulary = []
+#     for sample in data:
+#         dialog = sample['dialog']
+#         for sentence in dialog:
+#             context_data, vocabulary = retrieve_context_data(context_data, vocabulary, sentence[0])
+#         caption = sample['caption']
+#         context_data, vocabulary = retrieve_context_data(context_data, vocabulary, caption)
+#     vocabulary.extend(['UNKNOWN'])
+#     vocabulary = set(vocabulary)
+#     vocab_size = len(vocabulary)
+
+#     w2i = {word: i for i, word in enumerate(vocabulary)}
+
+#     return context_data, vocab_size, w2i
+
+def get_filtered_sentence(sentence):
+    sentence = sentence.translate(str.maketrans("","", string.punctuation))
+    filtered_sentence_list = [stem(word) for word in sentence.split() if word not in stopwords.words('english') if not word.isdigit()]
+    filtered_sentence = " ".join(filtered_sentence_list)
+    return filtered_sentence
+
+def process_data(data , PREPROCCES):
     context_data = []
     vocabulary = []
     for sample in data:
         dialog = sample['dialog']
         for sentence in dialog:
-            context_data, vocabulary = retrieve_context_data(context_data, vocabulary, sentence[0])
+            if PREPROCCES:
+                sentence = get_filtered_sentence(sentence[0])
+            else:
+                sentence = sentence[0]
+            context_data, vocabulary = retrieve_context_data(context_data, vocabulary, sentence)
         caption = sample['caption']
+        if PREPROCCES:
+            caption = get_filtered_sentence(caption)
         context_data, vocabulary = retrieve_context_data(context_data, vocabulary, caption)
     vocabulary.extend(['UNKNOWN'])
     vocabulary = set(vocabulary)
@@ -157,10 +190,16 @@ def main():
     data = list(train_data.values())
     data.extend(list(val_data.values()))
     data.extend(list(test_data.values()))
-    context_data, _, _ = process_data(list(train_data.values()))
-    _, vocab_size, w2i = process_data(data)
-    model = train_model_batches(context_data, vocab_size, w2i)
-    save_model(model, MODEL_PATH_EASY)
+    context_data, _, _ = process_data(list(train_data.values()), PREPROCCES)
+    _, vocab_size, w2i = process_data(data, PREPROCCES)
+
+    # model = train_model_batches(context_data, vocab_size, w2i)
+    if PREPROCCES:
+        path = "PREPROCCESS_" + MODEL_PATH_EASY
+        print(path)
+        save_model(model, path)
+    else:
+        save_model(model, MODEL_PATH_EASY)
     # model = load_model(MODEL_PATH_HARD)
     # print(model.embed_word_vector(['yachts', 'hello']))
     # print(model.embed_index_vector([100]))
