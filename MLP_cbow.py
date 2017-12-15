@@ -2,53 +2,70 @@ import read_data as rd
 import pickle
 import torch 
 import numpy as np
+import bow_dialog as bd
 
 from sklearn.neural_network import MLPRegressor
 from bow_dialog import CBOW
+from itertools import chain
 
 MODEL_PATH_EASY = 'CBOW_EASY.pth'
 MODEL_PATH_HARD = 'CBOW_HARD.pth'
 
 def retrieve_img_features(img_feature_data, img2id, img_id):
     img_features = np.array(img_feature_data[img2id[str(img_id)]])
-    return np.reshape(img_features, (1, len(img_features)))
+    return img_features
 
 # Retrieve context data and the vocabulary of the dialog and captions
 def retrieve_data(model, data, img2id, img_feature_data):
     input_data = []
     output_data = []
-    for i, sample in enumerate(data.values()):
-        input_data.append([])
-        output_data.append(sample['target_img_id'])
+    for sample in data.values():
+        embedded_text = []
         dialog = sample['dialog']
         for sentence in dialog:
-            input_data[i].extend(sentence[0].split())
-        input_data[i].extend(sample['caption'].split())
-        input_data[i] = model.embed_word_vector(input_data[i])
+            embedded_text.extend(sentence[0].split())
+        embedded_text.extend(sample['caption'].split())
+        embedded_text = model.embed_word_vector(embedded_text)
         img_ids = sample['img_list']
-        for j, img_id in enumerate(img_ids):
-            if j == 0:
-                img_feature_list = retrieve_img_features(img_feature_data, img2id, img_id)
+        img_feature_list = []
+        for img_id in img_ids:
+            img_feature = np.concatenate([embedded_text, retrieve_img_features(img_feature_data, img2id, img_id)], axis=0)
+            if img_id == sample['target_img_id']:
+                output_data.append(1)
             else:
-                img_feature_list = np.concatenate([img_feature_list, retrieve_img_features(img_feature_data, img2id, img_id)], axis=1)
-        input_data[i] = np.concatenate([img_feature_list, input_data[i]], axis=1)
+                output_data.append(0)
+            input_data.append(img_feature)
     return np.array(input_data), np.array(output_data)
 
 # Plot with x axis variable input data, y axis top-1 or top-5 accuracy
 def main():
     embed_model = torch.load(MODEL_PATH_EASY)
-  
+    
     img_feature_data, img2id, train_data_easy, val_data_easy, test_data_easy = rd.read_data('Easy')
     _, _, train_data_hard, val_data_hard, test_data_hard = rd.read_data('Hard')
+    data = list(train_data_easy.values())
+    data.extend(list(val_data_easy.values()))
+    data.extend(list(test_data_easy.values()))
+    _, _, w2i = bd.process_data(data)
 
     input_data_train, output_data_train = retrieve_data(embed_model, train_data_easy, img2id, img_feature_data)
+    input_data_test, output_data_test = retrieve_data(embed_model, test_data_easy, img2id, img_feature_data)
+    print('Data received')
 
-    MLPR = MLPRegressor(hidden_layer_sizes=(10), activation='logistic', solver='lbfgs', alpha=0.0005, max_iter=1)
-    print(input_data_train.reshape(input_data_train))
-    # MLPR.fit(input_data_train, output_data_train)
+    highest_score = 0.49261222289353745
+    # for i in range(100, 1500, 100):
+    MLPR = MLPRegressor(hidden_layer_sizes=(1000,), activation='logistic', solver='adam', alpha=0.0002, max_iter=10, learning_rate_init=0.0005)
+    MLPR.fit(input_data_train, output_data_train)
+    print('Trained')
+    score = MLPR.score(input_data_test, output_data_test)
+    print(score)
+    # with open('scores.txt', 'a') as f:
+    #     line = '{0}, {1} \n'.format(i, score)
+    #     f.write(line)
+    if score > highest_score:
+        pickle.dump(MLPR, open('MLPR.p', 'wb'))
+        print('Saved')
 
-    # print(MLPR.predict(input_data_train[0]))
-    # print(MLPR.score(X_test, y_test))
     # models.append((MLPR, MLPR.score(X_train, y_train) + MLPR.score(X_test, y_test)))
     # models.sort(key=lambda x:x[1], reverse=True)
 

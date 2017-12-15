@@ -1,11 +1,13 @@
 from collections import Counter
 from itertools import compress
+from itertools import chain
 
 import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+
 
 import read_data as rd
 import numpy as np
@@ -21,6 +23,8 @@ ITERATIONS = 10
 BATCH_SIZE = 256
 MODEL_PATH_EASY = 'CBOW_EASY.pth'
 MODEL_PATH_HARD = 'CBOW_HARD.pth'
+EASY = 'Easy'
+HARD = 'Hard' 
 
 class CBOW(nn.Module):
     def __init__(self, embedding_dim, vocab_size, w2i):
@@ -29,6 +33,10 @@ class CBOW(nn.Module):
         self.linear = nn.Linear(embedding_dim, vocab_size)
         self.loss_function = nn.NLLLoss()
         self.w2i = w2i
+        self.init_weights()
+
+    def init_weights(self):
+        self.embedding.weight.data.uniform_(-0.1, 0.1)
 
     # Minimize (A*sum(q) + b), a linear combination with the sum of the embedded input
     def forward(self, inputs, target):
@@ -42,8 +50,8 @@ class CBOW(nn.Module):
         return self.loss_function(probabilities, target)
 
     def embed_word_vector(self, word_vector):
-        embedded_vector = self.embedding(autograd.Variable(torch.LongTensor(np.array(context_to_index(word_vector, self.w2i))))).cuda()
-        embedded_vector = torch.sum(embedded_vector, dim=0).view(1, -1)
+        embedded_vector = self.embedding(autograd.Variable(torch.LongTensor(np.array(context_to_index(word_vector, self.w2i))).cuda())).cuda()
+        embedded_vector = torch.sum(embedded_vector, dim=0)
         return embedded_vector.data.cpu().numpy()
 
 # Simple timer decorator
@@ -71,13 +79,13 @@ def retrieve_context_data(context_data, vocabulary, sentence):
 def process_data(data):
     context_data = []
     vocabulary = []
-    for sample in data.values():
+    for sample in data:
         dialog = sample['dialog']
         for sentence in dialog:
             context_data, vocabulary = retrieve_context_data(context_data, vocabulary, sentence[0])
         caption = sample['caption']
         context_data, vocabulary = retrieve_context_data(context_data, vocabulary, caption)
-
+    vocabulary.extend(['UNKNOWN'])
     vocabulary = set(vocabulary)
     vocab_size = len(vocabulary)
 
@@ -87,7 +95,17 @@ def process_data(data):
 
 
 def context_to_index(context, w2i):
-    return np.array([w2i[word] for word in context])
+    index_vec = []
+    for word in context:
+        if word in w2i.keys():
+            index_vec.append(w2i[word])
+        else:
+            index_vec.append(w2i['UNKNOWN'])
+    return index_vec
+
+# def save_loss(loss):
+#     file =
+#     with open('Total_loss.txt')
 
 @timer
 def train_model_batches(context_data, vocab_size, w2i):
@@ -98,7 +116,7 @@ def train_model_batches(context_data, vocab_size, w2i):
     model.cuda()
     optimizer = optim.SGD(model.parameters(), lr=0.001)
 
-    context_data = context_data[:2000]
+    # context_data = context_data[:2000]
     for iteration in range(ITERATIONS):
         total_loss = torch.Tensor([0]).cuda()
         for i in range(0, len(context_data), BATCH_SIZE):
@@ -122,7 +140,7 @@ def train_model_batches(context_data, vocab_size, w2i):
             optimizer.step()
             
             total_loss += loss.data
-
+        # save_loss(total_loss)
         print("Total loss iteration {0}: {1}".format(iteration, total_loss))
 
     return model
@@ -135,13 +153,17 @@ def load_model(path):
     return model
 
 def main():
-    # _, _, data_easy, data_hard = rd.read_data()
-    # context_data, vocab_size, w2i = process_data(data_easy)
-    # model = train_model_batches(context_data, vocab_size, w2i)
-    # save_model(model, MODEL_PATH_EASY)
-    model = load_model(MODEL_PATH_EASY)
-    print(model.embed_word_vector(['yachts', 'hello']))
-    print(model.embed_index_vector([100]))
+    _, _, train_data, val_data, test_data = rd.read_data(EASY)
+    data = list(train_data.values())
+    data.extend(list(val_data.values()))
+    data.extend(list(test_data.values()))
+    context_data, _, _ = process_data(list(train_data.values()))
+    _, vocab_size, w2i = process_data(data)
+    model = train_model_batches(context_data, vocab_size, w2i)
+    save_model(model, MODEL_PATH_EASY)
+    # model = load_model(MODEL_PATH_HARD)
+    # print(model.embed_word_vector(['yachts', 'hello']))
+    # print(model.embed_index_vector([100]))
 
 
 if __name__ == "__main__":
