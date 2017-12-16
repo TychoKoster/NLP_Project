@@ -10,7 +10,9 @@ from itertools import chain
 
 MODEL_PATH_EASY = 'CBOW_EASY.pth'
 MODEL_PATH_HARD = 'CBOW_HARD.pth'
-PREPROCCESS = True
+PRE_MODEL_PATH_EASY = 'PREPROCCESS_CBOW_EASY.pth'
+PRE_MODEL_PATH_HARD = 'PREPROCCESS_CBOW_HARD.pth'
+PREPROCCESS = False
 
 def retrieve_img_features(img_feature_data, img2id, img_id):
     img_features = np.array(img_feature_data[img2id[str(img_id)]])
@@ -47,7 +49,7 @@ def retrieve_data(model, data, img2id, img_feature_data):
 
 # Plot with x axis variable input data, y axis top-1 or top-5 accuracy
 def main():
-    embed_model = torch.load(MODEL_PATH_EASY)
+    embed_model = torch.load(MODEL_PATH_HARD)
     
     img_feature_data, img2id, train_data_easy, val_data_easy, test_data_easy = rd.read_data('Easy')
     _, _, train_data_hard, val_data_hard, test_data_hard = rd.read_data('Hard')
@@ -56,8 +58,8 @@ def main():
     # data.extend(list(test_data_easy.values()))
     # _, _, w2i = bd.process_data(data)
 
-    input_data_train, output_data_train = retrieve_data(embed_model, train_data_easy, img2id, img_feature_data)
-    input_data_test, output_data_test = retrieve_data(embed_model, test_data_easy, img2id, img_feature_data)
+    input_data_train, output_data_train = retrieve_data(embed_model, train_data_hard, img2id, img_feature_data)
+    input_data_test, output_data_test = retrieve_data(embed_model, test_data_hard, img2id, img_feature_data)
     print('Data received')
 
     # for i in range(100, 1500, 100):
@@ -70,9 +72,9 @@ def main():
     #     line = '{0}, {1} \n'.format(i, score)
     #     f.write(line)
     if PREPROCCESS:
-        pickle.dump(MLPR, open('PREPROCCESSED_MLPR.p', 'wb'))
+        pickle.dump(MLPR, open('PREPROCCESSED_HARD_MLPR.p', 'wb'))
     else:
-        pickle.dump(MLPR, open('MLPR.p', 'wb'))
+        pickle.dump(MLPR, open('HARD_MLPR.p', 'wb'))
     print('Saved')
 
     # models.append((MLPR, MLPR.score(X_train, y_train) + MLPR.score(X_test, y_test)))

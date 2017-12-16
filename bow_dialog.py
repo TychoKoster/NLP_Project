@@ -28,7 +28,7 @@ MODEL_PATH_EASY = 'CBOW_EASY.pth'
 MODEL_PATH_HARD = 'CBOW_HARD.pth'
 EASY = 'Easy'
 HARD = 'Hard' 
-PREPROCCES = True
+PREPROCCES = False
 
 class CBOW(nn.Module):
     def __init__(self, embedding_dim, vocab_size, w2i):
@@ -103,7 +103,7 @@ def get_filtered_sentence(sentence):
     filtered_sentence = " ".join(filtered_sentence_list)
     return filtered_sentence
 
-def process_data(data , PREPROCCES):
+def process_data(data):
     context_data = []
     vocabulary = []
     for sample in data:
@@ -136,9 +136,14 @@ def context_to_index(context, w2i):
             index_vec.append(w2i['UNKNOWN'])
     return index_vec
 
-# def save_loss(loss):
-#     file =
-#     with open('Total_loss.txt')
+def save_loss(loss):
+    writeline = "{0} \n".format(loss)
+    if PREPROCCES:
+        with open("PREPROCCES_HARD_Total_loss.txt", "a+") as f:
+            f.write(writeline)
+    else:
+        with open("HARD_Total_loss.txt", "a+") as f:
+            f.write(writeline)        
 
 @timer
 def train_model_batches(context_data, vocab_size, w2i):
@@ -173,7 +178,7 @@ def train_model_batches(context_data, vocab_size, w2i):
             optimizer.step()
             
             total_loss += loss.data
-        # save_loss(total_loss)
+        save_loss(total_loss)
         print("Total loss iteration {0}: {1}".format(iteration, total_loss))
 
     return model
@@ -186,20 +191,21 @@ def load_model(path):
     return model
 
 def main():
-    _, _, train_data, val_data, test_data = rd.read_data(EASY)
+    _, _, train_data, val_data, test_data = rd.read_data(HARD)
     data = list(train_data.values())
     data.extend(list(val_data.values()))
     data.extend(list(test_data.values()))
-    context_data, _, _ = process_data(list(train_data.values()), PREPROCCES)
-    _, vocab_size, w2i = process_data(data, PREPROCCES)
+    context_data, _, _ = process_data(list(train_data.values()))
+    _, vocab_size, w2i = process_data(data)
+    print("Preproccessed")
 
-    # model = train_model_batches(context_data, vocab_size, w2i)
+    model = train_model_batches(context_data, vocab_size, w2i)
     if PREPROCCES:
-        path = "PREPROCCESS_" + MODEL_PATH_EASY
+        path = "PREPROCCESS_" + MODEL_PATH_HARD
         print(path)
         save_model(model, path)
     else:
-        save_model(model, MODEL_PATH_EASY)
+        save_model(model, MODEL_PATH_HARD)
     # model = load_model(MODEL_PATH_HARD)
     # print(model.embed_word_vector(['yachts', 'hello']))
     # print(model.embed_index_vector([100]))
