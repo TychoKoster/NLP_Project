@@ -2,7 +2,7 @@ import read_data as rd
 import pickle
 import torch 
 import numpy as np
-import bow_dialog as bd
+import CBOW_training as bd
 
 from sklearn.neural_network import MLPRegressor
 from bow_dialog import CBOW
