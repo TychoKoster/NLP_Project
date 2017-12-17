@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import read_data as rd
 import pickle
-import bow_dialog as bd
+import CBOW_training as bd
 import matplotlib.pyplot as plt
 
 
